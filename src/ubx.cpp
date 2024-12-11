@@ -69,7 +69,7 @@
 
 GPSDriverUBX::GPSDriverUBX(Interface gpsInterface, GPSCallbackPtr callback, void *callback_user,
 			   sensor_gps_s *gps_position, satellite_info_s *satellite_info, uint8_t dynamic_model,
-			   float heading_offset, int32_t uart2_baudrate, UBXMode mode) :
+			   float heading_offset, int32_t uart2_baudrate, UBXMode mode, uint8_t dgnssto) :
 	GPSBaseStationSupport(callback, callback_user),
 	_interface(gpsInterface),
 	_gps_position(gps_position),
@@ -77,7 +77,8 @@ GPSDriverUBX::GPSDriverUBX(Interface gpsInterface, GPSCallbackPtr callback, void
 	_dyn_model(dynamic_model),
 	_mode(mode),
 	_heading_offset(heading_offset),
-	_uart2_baudrate(uart2_baudrate)
+	_uart2_baudrate(uart2_baudrate),
+	_dgnssto(dgnssto)
 {
 	decodeInit();
 }
@@ -546,6 +547,7 @@ int GPSDriverUBX::configureDevice(const GPSConfig &config, const int32_t uart2_b
 	cfgValset<uint8_t>(UBX_CFG_KEY_NAVSPG_UTCSTANDARD, 3 /* USNO (U.S. Naval Observatory derived from GPS) */,
 			   cfg_valset_msg_size);
 	cfgValset<uint8_t>(UBX_CFG_KEY_NAVSPG_DYNMODEL, _dyn_model, cfg_valset_msg_size);
+	cfgValset<uint8_t>(UBX_CFG_KEY_NAVSPG_CONSTR_DGNSSTO, _dgnssto, cfg_valset_msg_size);
 
 	// disable odometer & filtering
 	cfgValset<uint8_t>(UBX_CFG_KEY_ODO_USE_ODO, 0, cfg_valset_msg_size);
