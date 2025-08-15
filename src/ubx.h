@@ -927,8 +927,9 @@ public:
 	int configure(unsigned &baudrate, const GPSConfig &config) override;
 	int receive(unsigned timeout) override;
 	int reset(GPSRestartType restart_type) override;
+	bool disableUbxMBRover() override;
 
-	bool shouldInjectRTCM() override { return _mode != UBXMode::RoverWithMovingBase; }
+	bool shouldInjectRTCM() override { return _mode != UBXMode::RoverWithMovingBase || _disabled_rover_mode; }
 
 	enum class Board : uint8_t {
 		unknown = 0,
@@ -1107,6 +1108,7 @@ private:
 
 	const UBXMode _mode;
 	const float _heading_offset;
+	bool _disabled_rover_mode{false};
 };
 
 
