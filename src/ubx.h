@@ -1018,8 +1018,10 @@ public:
 	int configure(unsigned &baudrate, const GPSConfig &config) override;
 	int receive(unsigned timeout) override;
 	int reset(GPSRestartType restart_type) override;
+	bool disableUbxMBRover() override;
+	bool enableUbxMBRover() override;
 
-	bool shouldInjectRTCM() override { return _configured && _mode != UBXMode::RoverWithMovingBase; }
+	bool shouldInjectRTCM() override { return _configured && (_mode != UBXMode::RoverWithMovingBase || _disabled_rover_mode); }
 
 	enum class Board : uint8_t {
 		unknown = 0,
@@ -1163,6 +1165,22 @@ private:
 	 */
 	int waitForAck(const uint16_t msg, const unsigned timeout, const bool report);
 
+	/**
+	 * Perform a soft position reset
+	 * A u-blox F9P enters "rover mode" when it gets RTCM 4072.1 messages from a moving base.
+	 * The quickest way I've found to exit "rover mode" is to send a soft position reset.
+	 *
+	 * A reset is also required when switching from "normal operation" with a static base to
+	 * rover mode. If not, it won't get RTK fix with the data from the moving base.
+	 * I'm not totally sure of the mechanism here.
+	 *
+	 * When performing a soft position reset, the receiver drops to no fix (0) temporarily.
+	 * In all out testing so far, it recovers within one second.
+	 *
+	 * @return true on success, false on write error (errno set)
+	 */
+	bool softResetPosition();
+
 	const Interface _interface{};
 
 	gps_abstime             _disable_cmd_last{0};
@@ -1208,6 +1226,7 @@ private:
 	const int32_t _uart2_baudrate {};
 	const bool _ppk_output {};
 	const bool _jam_det_sensitivity_hi {};
+	bool _disabled_rover_mode{false};
 };
 
 
