@@ -220,6 +220,8 @@ public:
 	 */
 	virtual int reset(GPSRestartType restart_type)	{ (void)restart_type; return -1; }
 
+	virtual bool disableUbxMBRover() { return false; }
+
 	float getPositionUpdateRate() { return _rate_lat_lon; }
 	float getVelocityUpdateRate() { return _rate_vel; }
 	void resetUpdateRates();
