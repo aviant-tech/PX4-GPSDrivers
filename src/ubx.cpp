@@ -51,6 +51,7 @@
  */
 
 #include <string.h>
+#include <errno.h>
 
 #include "rtcm.h"
 #include "ubx.h"
