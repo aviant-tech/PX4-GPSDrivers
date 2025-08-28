@@ -2401,7 +2401,8 @@ GPSDriverUBX::reset(GPSRestartType restart_type)
 	return -2;
 }
 
-bool GPSDriverUBX::disableUbxMBRover() {
+bool GPSDriverUBX::disableUbxMBRover()
+{
 	if (_mode == UBXMode::RoverWithMovingBase) {
 		UBX_DEBUG("Disabling RoverWithMovingBase, switching to normal operation");
 		int cfg_valset_msg_size = initCfgValset();
@@ -2431,9 +2432,10 @@ bool GPSDriverUBX::disableUbxMBRover() {
 		_disabled_rover_mode = true;
 		return true;
 
-	} else if (_mode == UBXMode::RoverWithMovingBaseUART1){
+	} else if (_mode == UBXMode::RoverWithMovingBaseUART1) {
 		UBX_WARN("Error: disableUbxMBRover() not implemented for RoverWithMovingBaseUART1");
 		return false;
+
 	} else {
 		UBX_WARN("Error: Attempted to call disableUbxMBRover() when not in rover mode");
 		return false;
