@@ -929,7 +929,7 @@ public:
 	int reset(GPSRestartType restart_type) override;
 	bool disableUbxMBRover() override;
 
-	bool shouldInjectRTCM() override { return _mode != UBXMode::RoverWithMovingBase || _disabled_rover_mode; }
+	bool shouldInjectRTCM() override { return _configured && (_mode != UBXMode::RoverWithMovingBase || _disabled_rover_mode); }
 
 	enum class Board : uint8_t {
 		unknown = 0,
