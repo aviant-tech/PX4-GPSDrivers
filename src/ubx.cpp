@@ -699,6 +699,9 @@ int GPSDriverUBX::configureDevice(const GNSSSystemsMask &gnssSystems)
 			return -1;
 		}
 
+		// In case the receiver was in disabled rover mode before a flight controller reboot.
+		softResetPosition();
+
 	} else if (_mode == UBXMode::MovingBase) {
 		UBX_DEBUG("Configuring UART2 for moving base");
 		// enable RTCM output on uart2 + set baudrate
