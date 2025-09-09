@@ -1074,6 +1074,16 @@ private:
 
 	/**
 	 * Perform a soft position reset
+	 * A u-blox F9P enters "rover mode" when it gets RTCM 4072.1 messages from a moving base.
+	 * The quickest way I've found to exit "rover mode" is to send a soft position reset.
+	 *
+	 * A reset is also required when switching from "normal operation" with a static base to
+	 * rover mode. If not, it won't get RTK fix with the data from the moving base.
+	 * I'm not totally sure of the mechanism here.
+	 *
+	 * When performing a soft position reset, the receiver drops to no fix (0) temporarily.
+	 * In all out testing so far, it recovers within one second.
+	 *
 	 * @return true on success, false on write error (errno set)
 	 */
 	bool softResetPosition();
