@@ -928,6 +928,7 @@ public:
 	int receive(unsigned timeout) override;
 	int reset(GPSRestartType restart_type) override;
 	bool disableUbxMBRover() override;
+	bool enableUbxMBRover() override;
 
 	bool shouldInjectRTCM() override { return _configured && (_mode != UBXMode::RoverWithMovingBase || _disabled_rover_mode); }
 
@@ -1070,6 +1071,12 @@ private:
 	 * Wait for message acknowledge
 	 */
 	int waitForAck(const uint16_t msg, const unsigned timeout, const bool report);
+
+	/**
+	 * Perform a soft position reset
+	 * @return true on success, false on write error (errno set)
+	 */
+	bool softResetPosition();
 
 	const Interface _interface{};
 
