@@ -699,6 +699,9 @@ int GPSDriverUBX::configureDevice(const GNSSSystemsMask &gnssSystems)
 			return -1;
 		}
 
+		// In case the receiver was in disabled rover mode before a flight controller reboot.
+		softResetPosition();
+
 	} else if (_mode == UBXMode::MovingBase) {
 		UBX_DEBUG("Configuring UART2 for moving base");
 		// enable RTCM output on uart2 + set baudrate
@@ -2401,43 +2404,65 @@ GPSDriverUBX::reset(GPSRestartType restart_type)
 	return -2;
 }
 
+bool GPSDriverUBX::softResetPosition()
+{
+	memset(&_buf.payload_tx_cfg_rst, 0, sizeof(_buf.payload_tx_cfg_rst));
+	_buf.payload_tx_cfg_rst.resetMode = 0x02; // GPS-only software reset
+	_buf.payload_tx_cfg_rst.navBbrMask = 0b10000; // Only reset position
+
+	return sendMessage(UBX_MSG_CFG_RST, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_rst));
+}
+
 bool GPSDriverUBX::disableUbxMBRover()
 {
-	if (_mode == UBXMode::RoverWithMovingBase) {
-		UBX_DEBUG("Disabling RoverWithMovingBase, switching to normal operation");
-		int cfg_valset_msg_size = initCfgValset();
+	UBX_DEBUG("Disabling RoverWithMovingBase");
+	int cfg_valset_msg_size = initCfgValset();
 
-		// Disable RTCM input from moving base (UART2)
-		cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART2INPROT_RTCM3X, 0, cfg_valset_msg_size);
-		// Stop sending RELPOSNED
-		cfgValsetPort(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_I2C, 0, cfg_valset_msg_size);
-		// Enable RTCM input from flight controller (UART1), so corrections from static base can be used
-		cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART1INPROT_RTCM3X, 1, cfg_valset_msg_size);
+	// Disable RTCM input from moving base (UART2)
+	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART2INPROT_RTCM3X, 0, cfg_valset_msg_size);
+	// Stop sending RELPOSNED
+	cfgValsetPort(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_UART1, 0, cfg_valset_msg_size);
+	// Enable RTCM input from flight controller (UART1), so corrections from static base can be used
+	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART1INPROT_RTCM3X, 1, cfg_valset_msg_size);
 
-		if (!sendMessage(UBX_MSG_CFG_VALSET, (uint8_t *)&_buf, cfg_valset_msg_size)) {
-			UBX_WARN("Error: disableUbxMBRover() failed to send UBX_MSG_CFG_VALSET (%d)", errno);
-			return false;
-		}
-
-		// Perform a position reset, this causes receiver to exit rover mode
-		memset(&_buf.payload_tx_cfg_rst, 0, sizeof(_buf.payload_tx_cfg_rst));
-		_buf.payload_tx_cfg_rst.resetMode = 0x02; // GPS-only software reset
-		_buf.payload_tx_cfg_rst.navBbrMask = 0b10000; // Only reset position
-
-		if (!sendMessage(UBX_MSG_CFG_RST, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_rst))) {
-			UBX_WARN("Error: disableUbxMBRover() failed to send UBX_MSG_CFG_RST (%d)", errno);
-			return false;
-		}
-
-		_disabled_rover_mode = true;
-		return true;
-
-	} else if (_mode == UBXMode::RoverWithMovingBaseUART1) {
-		UBX_WARN("Error: disableUbxMBRover() not implemented for RoverWithMovingBaseUART1");
-		return false;
-
-	} else {
-		UBX_WARN("Error: Attempted to call disableUbxMBRover() when not in rover mode");
+	if (!sendMessage(UBX_MSG_CFG_VALSET, (uint8_t *)&_buf, cfg_valset_msg_size)) {
+		UBX_WARN("Error: disableUbxMBRover() failed to send UBX_MSG_CFG_VALSET (%d)", errno);
 		return false;
 	}
+
+	if (!softResetPosition()) {
+		UBX_WARN("Error: disableUbxMBRover() failed to reset receiver (%d)", errno);
+		return false;
+	}
+
+
+
+	_disabled_rover_mode = true;
+	return true;
+}
+
+bool GPSDriverUBX::enableUbxMBRover()
+{
+	UBX_DEBUG("Enabling RoverWithMovingBase");
+	int cfg_valset_msg_size = initCfgValset();
+
+	// Enable RTCM input from moving base (UART2)
+	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART2INPROT_RTCM3X, 1, cfg_valset_msg_size);
+	// Start sending RELPOSNED
+	cfgValsetPort(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_UART1, 1, cfg_valset_msg_size);
+	// Disable RTCM input from flight controller (UART1)
+	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART1INPROT_RTCM3X, 0, cfg_valset_msg_size);
+
+	if (!sendMessage(UBX_MSG_CFG_VALSET, (uint8_t *)&_buf, cfg_valset_msg_size)) {
+		UBX_WARN("Error: enableUbxMBRover() failed to send UBX_MSG_CFG_VALSET (%d)", errno);
+		return false;
+	}
+
+	if (!softResetPosition()) {
+		UBX_WARN("Error: enableUbxMBRover() failed to reset receiver (%d)", errno);
+		return false;
+	}
+
+	_disabled_rover_mode = false;
+	return true;
 }
