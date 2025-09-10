@@ -2421,7 +2421,7 @@ bool GPSDriverUBX::disableUbxMBRover()
 	// Disable RTCM input from moving base (UART2)
 	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART2INPROT_RTCM3X, 0, cfg_valset_msg_size);
 	// Stop sending RELPOSNED
-	cfgValsetPort(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_UART1, 0, cfg_valset_msg_size);
+	cfgValset<uint8_t>(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_UART1, 0, cfg_valset_msg_size);
 	// Enable RTCM input from flight controller (UART1), so corrections from static base can be used
 	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART1INPROT_RTCM3X, 1, cfg_valset_msg_size);
 
@@ -2449,7 +2449,7 @@ bool GPSDriverUBX::enableUbxMBRover()
 	// Enable RTCM input from moving base (UART2)
 	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART2INPROT_RTCM3X, 1, cfg_valset_msg_size);
 	// Start sending RELPOSNED
-	cfgValsetPort(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_UART1, 1, cfg_valset_msg_size);
+	cfgValset<uint8_t>(UBX_CFG_KEY_MSGOUT_UBX_NAV_RELPOSNED_UART1, 1, cfg_valset_msg_size);
 	// Disable RTCM input from flight controller (UART1)
 	cfgValset<uint8_t>(UBX_CFG_KEY_CFG_UART1INPROT_RTCM3X, 0, cfg_valset_msg_size);
 
