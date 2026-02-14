@@ -1227,6 +1227,8 @@ private:
 	const bool _ppk_output {};
 	const bool _jam_det_sensitivity_hi {};
 	bool _disabled_rover_mode{false};
+	bool _test_overflow_pending{false};
+	bool _test_overflow_done{false};
 };
 
 
