@@ -1100,6 +1100,35 @@ GPSDriverUBX::receive(unsigned timeout)
 		} else if (ret > 0) {
 			//UBX_DEBUG("read %d bytes", ret);
 
+			/* Test: inject a crafted RXM-RTCM frame with length=100 to trigger
+			 * the payloadRxAdd buffer overflow into _decode_state.
+			 * Triggered on first RXM-RTCM received (= F9P got RTCM corrections).
+			 *
+			 * Byte at payload index 92 overwrites _decode_state (offset 0xB5) with 0x09
+			 * (UBX_DECODE_RTCM3). Next parseChar() call dereferences _rtcm_parsing (NULL).
+			 * Without the fix → hardfault. With the fix → recovered gracefully.
+			 */
+			if (_test_overflow_pending) {
+				_test_overflow_pending = false;
+				_test_overflow_done = true;
+				UBX_WARN(">>> TEST: injecting crafted RXM-RTCM (len=100) to trigger overflow");
+
+				const uint8_t hdr[] = {0xB5, 0x62, 0x02, 0x32, 100, 0x00};
+
+				for (unsigned k = 0; k < sizeof(hdr); k++) {
+					parseChar(hdr[k]);
+				}
+
+				for (unsigned k = 0; k < 100; k++) {
+					parseChar(k == 92 ? 0x09 : 0xAA);
+				}
+
+				// This byte is parsed with corrupted _decode_state=9 (UBX_DECODE_RTCM3)
+				parseChar(0x00);
+
+				UBX_WARN(">>> TEST: overflow survived (bug is fixed)");
+			}
+
 			/* pass received bytes to the packet decoder */
 			for (int i = 0; i < ret; i++) {
 				handled |= parseChar(buf[i]);
@@ -2305,6 +2334,10 @@ GPSDriverUBX::payloadRxDone()
 
 		_gps_position->rtcm_msg_used  = (_buf.payload_rx_rxm_rtcm.flags & UBX_RX_RXM_RTCM_MSGUSED_MASK) >>
 						UBX_RX_RXM_RTCM_MSGUSED_SHIFT;
+
+		if (!_test_overflow_pending && !_test_overflow_done && gps_absolute_time() > 30000000ULL) {
+			_test_overflow_pending = true;
+		}
 
 		ret = 1;
 		break;
