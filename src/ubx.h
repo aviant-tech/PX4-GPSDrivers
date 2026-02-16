@@ -100,7 +100,7 @@
 #define UBX_ID_CFG_PRT        0x00 // deprecated in protocol version >= 27 -> use CFG_VALSET
 #define UBX_ID_CFG_MSG        0x01 // deprecated in protocol version >= 27 -> use CFG_VALSET
 #define UBX_ID_CFG_RATE       0x08 // deprecated in protocol version >= 27 -> use CFG_VALSET
-#define UBX_ID_CFG_CFG        0x09 // deprecated in protocol version >= 27 -> use CFG_VALSET
+#define UBX_ID_CFG_CFG        0x09 // deprecated in protocol version >= 27 for individual config (not for global clear/save/load)
 #define UBX_ID_CFG_NAV5       0x24 // deprecated in protocol version >= 27 -> use CFG_VALSET
 #define UBX_ID_CFG_RST        0x04
 #define UBX_ID_CFG_SBAS       0x16
@@ -328,6 +328,9 @@
 #define UBX_CFG_KEY_NAVSPG_FIXMODE              0x20110011
 #define UBX_CFG_KEY_NAVSPG_UTCSTANDARD          0x2011001c
 #define UBX_CFG_KEY_NAVSPG_DYNMODEL             0x20110021
+#define UBX_CFG_KEY_NAVSPG_INFIL_MINCNO         0x201100a3
+#define UBX_CFG_KEY_NAVSPG_INFIL_MINELEV        0x201100a4
+#define UBX_CFG_KEY_NAVSPG_CONSTR_DGNSSTO       0x201100c4
 
 #define UBX_CFG_KEY_ODO_USE_ODO                 0x10220001
 #define UBX_CFG_KEY_ODO_USE_COG                 0x10220002
@@ -335,6 +338,8 @@
 #define UBX_CFG_KEY_ODO_OUTLPCOG                0x10220004
 
 #define UBX_CFG_KEY_ITFM_ENABLE                 0x1041000d
+
+#define UBX_CFG_KEY_SEC_JAMDET_SENSITIVITY_HI   0x10f60051
 
 #define UBX_CFG_KEY_RATE_MEAS                   0x30210001
 #define UBX_CFG_KEY_RATE_NAV                    0x30210002
@@ -401,21 +406,32 @@
 #define UBX_CFG_KEY_SIGNAL_GPS_ENA              0x1031001f  /**< GPS enable */
 #define UBX_CFG_KEY_SIGNAL_GPS_L1CA_ENA         0x10310001  /**< GPS L1C/A */
 #define UBX_CFG_KEY_SIGNAL_GPS_L2C_ENA          0x10310003  /**< GPS L2C (only on u-blox F9 platform products) */
+#define UBX_CFG_KEY_SIGNAL_GPS_L5_ENA           0x10310004  /**< GPS L5 (only on u-blox F9-15B) */
 #define UBX_CFG_KEY_SIGNAL_SBAS_ENA             0x10310020  /**< SBAS enable */
 #define UBX_CFG_KEY_SIGNAL_SBAS_L1CA_ENA        0x10310005  /**< SBAS L1C/A */
 #define UBX_CFG_KEY_SIGNAL_GAL_ENA              0x10310021  /**< Galileo enable */
 #define UBX_CFG_KEY_SIGNAL_GAL_E1_ENA           0x10310007  /**< Galileo E1 */
 #define UBX_CFG_KEY_SIGNAL_GAL_E5B_ENA          0x1031000a  /**< Galileo E5b (only on u-blox F9 platform products) */
+#define UBX_CFG_KEY_SIGNAL_GAL_E5A_ENA          0x10310009  /**< Galileo E5a (only on u-blox F9-15B) */
+#define UBX_CFG_KEY_SIGNAL_GAL_E6_ENA           0x1031000b  /**< Galileo E6 (only on u-blox F9-15B and X20) */
 #define UBX_CFG_KEY_SIGNAL_BDS_ENA              0x10310022  /**< BeiDou Enable */
 #define UBX_CFG_KEY_SIGNAL_BDS_B1_ENA           0x1031000d  /**< BeiDou B1I */
+#define UBX_CFG_KEY_SIGNAL_BDS_B1C_ENA          0x1031000f  /**< BeiDou B1C (only on u-blox F9-15B) */
+#define UBX_CFG_KEY_SIGNAL_BDS_B2A_ENA          0x10310028  /**< BeiDou B2a  (only on u-blox F9-15B) */
 #define UBX_CFG_KEY_SIGNAL_BDS_B2_ENA           0x1031000e  /**< BeiDou B2I (only on u-blox F9 platform products) */
+#define UBX_CFG_KEY_SIGNAL_BDS_B3_ENA           0x10310010  /**< BeiDou B3I (only on u-blox F9-15B) */
 #define UBX_CFG_KEY_SIGNAL_QZSS_ENA             0x10310024  /**< QZSS enable */
 #define UBX_CFG_KEY_SIGNAL_QZSS_L1CA_ENA        0x10310012  /**< QZSS L1C/A */
 #define UBX_CFG_KEY_SIGNAL_QZSS_L1S_ENA         0x10310014  /**< QZSS L1S */
+#define UBX_CFG_KEY_SIGNAL_QZSS_L5_ENA          0x10310017  /**< QZSS L5 (only on u-blox F9-15B) */
 #define UBX_CFG_KEY_SIGNAL_QZSS_L2C_ENA         0x10310015  /**< QZSS L2C (only on u-blox F9 platform products) */
 #define UBX_CFG_KEY_SIGNAL_GLO_ENA              0x10310025  /**< GLONASS enable */
 #define UBX_CFG_KEY_SIGNAL_GLO_L1_ENA           0x10310018  /**< GLONASS L1 */
 #define UBX_CFG_KEY_SIGNAL_GLO_L2_ENA           0x1031001a  /**< GLONASS L2 (only on u-blox F9 platform products) */
+#define UBX_CFG_KEY_SIGNAL_NAVIC_ENA            0x10310026  /**< NavIC enable (only on u-blox F9-15B)*/
+#define UBX_CFG_KEY_SIGNAL_NAVIC_L5_ENA         0x1031001d  /**< NavIC L5 (only on u-blox F9-15B) */
+
+#define UBX_CFG_KEY_SIGNAL_L5_HEALTH_OVERRIDE   0x10320001  /**< GPS L5 health override value */
 
 #define UBX_PAYLOAD_RX_NAV_PVT_SIZE_UBX7        (sizeof(ubx_payload_rx_nav_pvt_t) - 8)
 #define UBX_PAYLOAD_RX_NAV_PVT_SIZE_UBX8        (sizeof(ubx_payload_rx_nav_pvt_t))
@@ -711,6 +727,7 @@ typedef struct {
 	uint8_t  flags;
 	uint16_t subType;
 	uint16_t refStationID;
+	uint16_t msgType;
 } ubx_payload_rx_rxm_rtcm_t;
 
 /* Rx ACK-ACK */
@@ -948,8 +965,6 @@ typedef enum {
 	UBX_DECODE_PAYLOAD,
 	UBX_DECODE_CHKSUM1,
 	UBX_DECODE_CHKSUM2,
-
-	UBX_DECODE_RTCM3
 } ubx_decode_state_t;
 
 /* Rx message state */
@@ -978,14 +993,25 @@ public:
 		RoverWithMovingBaseUART1, ///< expect RTCM input on UART1 from a moving base for heading output
 		MovingBaseUART1,          ///< RTCM output on UART1 to a rover (GPS is installed on the vehicle)
 		RoverWithStaticBaseUart2,  ///< expect RTCM input on UART2 from a static base.
+		GroundControlStation, ///< NMEA output on UART2 to a ground control station (GPS is installed in GCS)
+	};
+
+	struct Settings {
+		uint8_t dynamic_model;
+		uint8_t dgnss_timeout;
+		uint8_t min_cno;
+		int8_t min_elev;
+		uint8_t output_rate;
+		float heading_offset;
+		int32_t uart2_baudrate;
+		bool ppk_output;
+		bool jam_det_sensitivity_hi;
+		UBXMode mode;
 	};
 
 	GPSDriverUBX(Interface gpsInterface, GPSCallbackPtr callback, void *callback_user,
 		     sensor_gps_s *gps_position, satellite_info_s *satellite_info,
-		     uint8_t dynamic_model = 7,
-		     float heading_offset = 0.f,
-		     int32_t uart2_baudrate = 57600,
-		     UBXMode mode = UBXMode::Normal);
+		     Settings settings);
 
 	virtual ~GPSDriverUBX();
 
@@ -1004,16 +1030,16 @@ public:
 		u_blox7 = 7,
 		u_blox8 = 8, ///< M8N or M8P
 		u_blox9 = 9, ///< M9N, or any F9*, except F9P
-		u_blox9_F9P = 10, ///< F9P
+		u_blox9_F9P_L1L2 = 10, ///< F9P
 		u_blox10 = 11,
+		u_blox9_F9P_L1L5 = 12, ///< ZED-F9P-15B
+		u_blox10_L1L5 = 13, ///< DAN-F10N
+		u_blox_X20 = 14,
 	};
 
 	const Board &board() const { return _board; }
 
 private:
-
-private:
-
 	int activateRTCMOutput(bool reduce_update_rate);
 
 	/**
@@ -1174,6 +1200,11 @@ private:
 	uint8_t _rx_ck_a{0};
 	uint8_t _rx_ck_b{0};
 	uint8_t _dyn_model{7};  ///< ublox Dynamic platform model default 7: airborne with <2g acceleration
+	uint8_t _dgnss_timeout{0}; ///< ublox DGNSS timeout.
+	uint8_t _min_cno{0};  ///< ublox minimum satellite signal level for navigation
+
+	int8_t _min_elev{0};  ///< ublox minimum elevation for a GNSS satellite to be used in navigation
+	uint8_t _output_rate{0};  ///< ublox output rate in Hz, 0 = auto-select based on module
 
 	uint16_t _ack_waiting_msg{0};
 	uint16_t _rx_msg{};
@@ -1193,6 +1224,8 @@ private:
 	const UBXMode _mode;
 	const float _heading_offset;
 	const int32_t _uart2_baudrate;
+	const bool _ppk_output {};
+	const bool _jam_det_sensitivity_hi {};
 	bool _disabled_rover_mode{false};
 };
 

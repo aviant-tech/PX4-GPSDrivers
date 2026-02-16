@@ -41,7 +41,12 @@
 
 #include <cstdint>
 #include <cstring>
-#include "../../definitions.h"
+
+#ifndef GPS_DEFINITIONS_HEADER
+#define GPS_DEFINITIONS_HEADER "../../definitions.h"
+#endif
+
+#include GPS_DEFINITIONS_HEADER
 
 #ifndef GPS_READ_BUFFER_SIZE
 #define GPS_READ_BUFFER_SIZE 150 ///< buffer size for the read() call. Messages can be longer than that.
@@ -181,7 +186,8 @@ public:
 		ENABLE_SBAS =       1 << 1,
 		ENABLE_GALILEO =    1 << 2,
 		ENABLE_BEIDOU =     1 << 3,
-		ENABLE_GLONASS =    1 << 4
+		ENABLE_GLONASS =    1 << 4,
+		ENABLE_NAVIC =      1 << 5
 	};
 
 	enum class InterfaceProtocolsMask : int32_t {
@@ -198,6 +204,7 @@ public:
 		OutputMode output_mode;
 		GNSSSystemsMask gnss_systems;
 		InterfaceProtocolsMask interface_protocols;
+		bool cfg_wipe;
 	};
 
 

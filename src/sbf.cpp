@@ -218,21 +218,41 @@ int GPSDriverSBF::configure(unsigned &baudrate, const GPSConfig &config)
 		}
 	} while (i < 5 && !response_detected);
 
+	if (_output_mode == OutputMode::GPSAndRTCM || _output_mode == OutputMode::RTCM) {
+		if (!_rtcm_parsing) {
+			_rtcm_parsing = new RTCMParsing();
+		}
+
+		_rtcm_parsing->reset();
+	}
+
+	sendMessageAndWaitForAck(SBF_CONFIG_OUTPUT_RTCM3, SBF_CONFIG_TIMEOUT);
+
 	if (_output_mode == OutputMode::RTCM) {
-		if (_base_settings.type == BaseSettingsType::fixed_position) {
+		switch (_base_settings.type) {
+		case (BaseSettingsType::fixed_position):
 			snprintf(msg, sizeof(msg), SBF_CONFIG_RTCM_STATIC_COORDINATES,
 				 _base_settings.settings.fixed_position.latitude,
 				 _base_settings.settings.fixed_position.longitude,
 				 static_cast<double>(_base_settings.settings.fixed_position.altitude));
 			sendMessageAndWaitForAck(msg, SBF_CONFIG_TIMEOUT);
+
 			snprintf(msg, sizeof(msg), SBF_CONFIG_RTCM_STATIC_OFFSET, 0.0, 0.0, 0.0);
 			sendMessageAndWaitForAck(msg, SBF_CONFIG_TIMEOUT);
+
 			sendMessageAndWaitForAck(SBF_CONFIG_RTCM_STATIC1, SBF_CONFIG_TIMEOUT);
 			sendMessageAndWaitForAck(SBF_CONFIG_RTCM_STATIC2, SBF_CONFIG_TIMEOUT);
+			break;
 
-		} else {
-			sendMessageAndWaitForAck(SBF_CONFIG_RTCM, SBF_CONFIG_TIMEOUT);
+		case (BaseSettingsType::survey_in):
+		default:
+			sendMessageAndWaitForAck(SBF_CONFIG_RTCM_SURVEY_IN, SBF_CONFIG_TIMEOUT);
+			break;
 		}
+
+		sendMessageAndWaitForAck(SBF_CONFIG_RTCM_STATUS, SBF_CONFIG_TIMEOUT);
+		_survey_active = true;
+		_survey_activation_date = gps_absolute_time();
 	}
 
 	_configured = true;
@@ -301,6 +321,7 @@ bool GPSDriverSBF::sendMessageAndWaitForAck(const char *msg, const int timeout)
 // 0b0000_0000 = no message handled (not set up yet)
 // 0b0000_0001 = message handled
 // 0b0000_0010 = sat info message handled
+// 0b0000_0100 = base station update (RTCM message or base station position)
 int GPSDriverSBF::receive(unsigned timeout)
 {
 	int handled = 0;
@@ -336,12 +357,13 @@ int GPSDriverSBF::receive(unsigned timeout)
 		}
 
 		if (handled > 0) {
+			SBF_DEBUG("Handled : %i", handled);
 			return handled;
 		}
 
 		// abort after timeout if no useful packets received
 		if (time_started + timeout * 1000 < gps_absolute_time()) {
-			SBF_DEBUG("timed out, returning");
+			SBF_DEBUG("timed out after %d ms, returning", timeout);
 			return -1;
 		}
 	}
@@ -351,9 +373,20 @@ int GPSDriverSBF::receive(unsigned timeout)
 // 0b0000_0000 = still decoding
 // 0b0000_0001 = message handled
 // 0b0000_0010 = sat info message handled
+// 0b0000_0100 = base station update
 int GPSDriverSBF::parseChar(const uint8_t b)
 {
 	int ret = 0;
+
+	if (_rtcm_parsing) {
+		if (_rtcm_parsing->addByte(b)) {
+			SBF_DEBUG("got RTCM message with length %i", (int) _rtcm_parsing->messageLength());
+			gotRTCMMessage(_rtcm_parsing->message(), _rtcm_parsing->messageLength());
+			decodeInit();
+			_rtcm_parsing->reset();
+			return 0b0100; // ret
+		}
+	}
 
 	switch (_decode_state) {
 
@@ -363,11 +396,6 @@ int GPSDriverSBF::parseChar(const uint8_t b)
 			SBF_TRACE_PARSER("A");
 			payloadRxAdd(b); // add a payload byte
 			_decode_state = SBF_DECODE_SYNC2;
-
-		} else if (b == RTCM3_PREAMBLE && _rtcm_parsing) {
-			SBF_TRACE_PARSER("RTCM");
-			_decode_state = SBF_DECODE_RTCM3;
-			_rtcm_parsing->addByte(b);
 		}
 
 		break;
@@ -397,23 +425,16 @@ int GPSDriverSBF::parseChar(const uint8_t b)
 
 		} else if (ret > 0) {
 			ret = payloadRxDone(); // finish payload processing
+
+			if (_rtcm_parsing) {
+				_rtcm_parsing->reset();
+			}
+
 			decodeInit();
 
 		} else {
 			// expecting more payload, stay in state SBF_DECODE_PAYLOAD
 			ret = 0;
-
-		}
-
-		break;
-
-	case SBF_DECODE_RTCM3:
-		if (_rtcm_parsing->addByte(b)) {
-			// Complete message received
-			SBF_DEBUG("got RTCM message with length %i", (int) _rtcm_parsing->messageLength());
-			gotRTCMMessage(_rtcm_parsing->message(), _rtcm_parsing->messageLength());
-			decodeInit();
-			ret |= 1;
 		}
 
 		break;
@@ -475,6 +496,7 @@ int GPSDriverSBF::payloadRxDone()
 	if (_buf.length <= 4 ||
 	    _buf.length > _rx_payload_index ||
 	    _buf.crc16 != crc16(reinterpret_cast<uint8_t *>(&_buf) + 4, _buf.length - 4)) {
+		SBF_TRACE_RXMSG("Rx Unknow");
 		return 0;
 	}
 
@@ -526,7 +548,7 @@ int GPSDriverSBF::payloadRxDone()
 				// other data, but it's really large: >800B)
 				_satellite_info->timestamp = gps_absolute_time();
 				_satellite_info->count = _gps_position->satellites_used;
-				ret = 2;
+				ret |= 2;
 			}
 
 		} else {
@@ -593,6 +615,22 @@ int GPSDriverSBF::payloadRxDone()
 		_rate_count_vel++;
 		_rate_count_lat_lon++;
 		ret |= (_msg_status == 7) ? 1 : 0;
+
+
+		// In RTCM mode, PVTGeodetic is used to get base station survey-in
+		if (_output_mode == OutputMode::RTCM) {
+			SurveyInStatus status{};
+			status.latitude = _gps_position->latitude_deg;
+			status.longitude = _gps_position->longitude_deg;
+			status.altitude = _gps_position->altitude_ellipsoid_m;
+			status.duration = _survey_active ? (float)(gps_absolute_time() - _survey_activation_date) / 1000000.0f : 0;
+			status.mean_accuracy = (_buf.payload_pvt_geodetic.h_accuracy + _buf.payload_pvt_geodetic.v_accuracy) /
+					       20; // Value in mm
+			status.flags = (_buf.payload_pvt_geodetic.mode_type > 0 ? 1 : 0) | (_survey_active & 1) << 1;
+			surveyInStatus(status);
+			ret |= 4; // RTCM infos have been updated
+		}
+
 		//SBF_DEBUG("PVTGeodetic handled");
 		break;
 
@@ -676,6 +714,7 @@ int GPSDriverSBF::payloadRxDone()
 		break;
 
 	default:
+		SBF_TRACE_RXMSG("Rx other.");
 		break;
 	}
 
@@ -694,16 +733,6 @@ void GPSDriverSBF::decodeInit()
 {
 	_decode_state = SBF_DECODE_SYNC1;
 	_rx_payload_index = 0;
-
-	if (_output_mode == OutputMode::GPSAndRTCM || _output_mode == OutputMode::RTCM) {
-		if (!_rtcm_parsing) {
-			_rtcm_parsing = new RTCMParsing();
-		}
-
-		if (_rtcm_parsing) {
-			_rtcm_parsing->reset();
-		}
-	}
 }
 
 int GPSDriverSBF::reset(GPSRestartType restart_type)
