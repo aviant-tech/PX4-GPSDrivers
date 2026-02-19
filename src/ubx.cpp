@@ -1094,7 +1094,7 @@ GPSDriverUBX::receive(unsigned timeout)
 
 		if (ret < 0) {
 			/* something went wrong when polling or reading */
-			UBX_WARN("ubx poll_or_read err");
+			UBX_WARN("%s: ubx poll_or_read err", deviceName());
 			return -1;
 
 		} else if (ret > 0) {
@@ -1119,7 +1119,8 @@ GPSDriverUBX::receive(unsigned timeout)
 
 		/* abort after timeout if no useful packets received */
 		if (time_started + timeout * 1000 < gps_absolute_time()) {
-			UBX_DEBUG("timed out, returning");
+			GPS_WARN("%s: ubx receive timeout (posllh: %d, velned: %d, configured: %d)",
+				 deviceName(), _got_posllh, _got_velned, _configured);
 			return -1;
 		}
 	}
@@ -1826,14 +1827,14 @@ GPSDriverUBX::payloadRxAddMonVer(const uint8_t b)
 			const char *fwver_str = strstr((const char *)_buf.payload_rx_mon_ver_part2.extension, "FWVER=");
 
 			if (fwver_str != nullptr) {
-				GPS_INFO("u-blox firmware version: %s", fwver_str + strlen("FWVER="));
+				GPS_INFO("%s: u-blox firmware version: %s", deviceName(), fwver_str + strlen("FWVER="));
 			}
 
 			// "PROTVER=" Supported protocol version.
 			const char *protver_str = strstr((const char *)_buf.payload_rx_mon_ver_part2.extension, "PROTVER=");
 
 			if (protver_str != nullptr) {
-				GPS_INFO("u-blox protocol version: %s", protver_str + strlen("PROTVER="));
+				GPS_INFO("%s: u-blox protocol version: %s", deviceName(), protver_str + strlen("PROTVER="));
 			}
 
 			// "MOD=" Module identification. Set in production.
@@ -1848,7 +1849,7 @@ GPSDriverUBX::payloadRxAddMonVer(const uint8_t b)
 					}
 				}
 
-				GPS_INFO("u-blox module: %s", mod_str + strlen("MOD="));
+				GPS_INFO("%s: u-blox module: %s", deviceName(), mod_str + strlen("MOD="));
 			}
 		}
 	}

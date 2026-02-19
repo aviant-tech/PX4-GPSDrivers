@@ -204,6 +204,9 @@ public:
 	GPSHelper(GPSCallbackPtr callback, void *callback_user);
 	virtual ~GPSHelper() = default;
 
+	void setDeviceName(const char *name) { _device_name = name; }
+	const char *deviceName() const { return _device_name ? _device_name : "?"; }
+
 	/**
 	 * configure the device
 	 * @param baud Input and output parameter: if set to 0, the baudrate will be automatically detected and set to
@@ -318,6 +321,7 @@ protected:
 
 	GPSCallbackPtr _callback{nullptr};
 	void *_callback_user{};
+	const char *_device_name{nullptr};
 
 	uint8_t _rate_count_lat_lon{};
 	uint8_t _rate_count_vel{};
