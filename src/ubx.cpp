@@ -56,6 +56,8 @@
 #include "rtcm.h"
 #include "ubx.h"
 
+using namespace time_literals;
+
 #define MIN(X,Y)              ((X) < (Y) ? (X) : (Y))
 #define SWAP16(X)             ((((X) >>  8) & 0x00ff) | (((X) << 8) & 0xff00))
 
@@ -2295,6 +2297,23 @@ GPSDriverUBX::payloadRxDone()
 		_gps_position->jamming_indicator	= _buf.payload_rx_mon_rf.block[0].jamInd;
 		_gps_position->jamming_state		= _buf.payload_rx_mon_rf.block[0].flags;
 
+		// Check if we are currently ignoring jamming reports due to a recent reset
+		if (_jamming_state_inhibited) {
+
+			// If the receiver is still reporting 'Critical' (3), it's likely a false positive
+			// from the re-acquisition phase. We override it to 'Unknown' (0).
+			if (_gps_position->jamming_state == 3) {
+				_gps_position->jamming_state = 0;
+
+			} else {
+				// Once the state moves away from 'Critical' (to OK, Warning, or Unknown),
+				// we assume the receiver has stabilized and stop inhibiting the reports.
+				_jamming_state_inhibited = false;
+			}
+		}
+
+		_gps_position->jamming_state_inhibited = _jamming_state_inhibited;
+
 		ret = 1;
 		break;
 
@@ -2563,6 +2582,8 @@ bool GPSDriverUBX::softResetPosition()
 	memset(&_buf.payload_tx_cfg_rst, 0, sizeof(_buf.payload_tx_cfg_rst));
 	_buf.payload_tx_cfg_rst.resetMode = 0x02; // GPS-only software reset
 	_buf.payload_tx_cfg_rst.navBbrMask = 0b10000; // Only reset position
+
+	_jamming_state_inhibited = true;
 
 	return sendMessage(UBX_MSG_CFG_RST, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_rst));
 }
