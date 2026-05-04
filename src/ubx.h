@@ -1195,6 +1195,7 @@ private:
 	const float _heading_offset;
 	const int32_t _uart2_baudrate;
 	bool _disabled_rover_mode{false};
+	bool _jamming_state_inhibited{false};
 };
 
 
