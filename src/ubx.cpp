@@ -1144,6 +1144,9 @@ GPSDriverUBX::parseChar(const uint8_t b)
 			UBX_TRACE_PARSER("RTCM");
 			_decode_state = UBX_DECODE_RTCM3;
 			_rtcm_parsing->addByte(b);
+
+		} else {
+			_counters.bytes_discarded++;
 		}
 
 		break;
@@ -1155,6 +1158,7 @@ GPSDriverUBX::parseChar(const uint8_t b)
 			_decode_state = UBX_DECODE_CLASS;
 
 		} else {		// Sync1 not followed by Sync2: reset parser
+			_counters.bytes_discarded += 2;
 			decodeInit();
 		}
 
@@ -1242,6 +1246,7 @@ GPSDriverUBX::parseChar(const uint8_t b)
 	case UBX_DECODE_CHKSUM1:
 		if (_rx_ck_a != b) {
 			UBX_DEBUG("ubx checksum err");
+			_counters.checksum_errors++;
 			decodeInit();
 
 		} else {
@@ -1254,6 +1259,7 @@ GPSDriverUBX::parseChar(const uint8_t b)
 	case UBX_DECODE_CHKSUM2:
 		if (_rx_ck_b != b) {
 			UBX_DEBUG("ubx checksum err");
+			_counters.checksum_errors++;
 
 		} else {
 			ret = payloadRxDone();	// finish payload processing
@@ -1554,6 +1560,7 @@ GPSDriverUBX::payloadRxInit()
 
 	case UBX_RXMSG_ERROR_LENGTH:	// error: invalid length
 		UBX_WARN("ubx msg 0x%04x invalid len %u", SWAP16((unsigned)_rx_msg), (unsigned)_rx_payload_length);
+		_counters.length_errors++;
 		ret = -1;	// return error, abort handling this message
 		break;
 
@@ -1880,6 +1887,17 @@ GPSDriverUBX::payloadRxDone()
 
 	case UBX_MSG_NAV_PVT:
 		UBX_TRACE_RXMSG("Rx NAV-PVT");
+
+		if (_last_pvt_itow_valid && _buf.payload_rx_nav_pvt.iTOW != _last_pvt_itow) {
+			const uint32_t itow_gap = (_buf.payload_rx_nav_pvt.iTOW + 604800000u - _last_pvt_itow) % 604800000u;
+
+			if (itow_gap > _counters.itow_gap_max_ms) {
+				_counters.itow_gap_max_ms = (itow_gap > UINT16_MAX) ? UINT16_MAX : static_cast<uint16_t>(itow_gap);
+			}
+		}
+
+		_last_pvt_itow = _buf.payload_rx_nav_pvt.iTOW;
+		_last_pvt_itow_valid = true;
 
 		//Check if position fix flag is good
 		if ((_buf.payload_rx_nav_pvt.flags & UBX_RX_NAV_PVT_FLAGS_GNSSFIXOK) == 1) {
@@ -2324,6 +2342,16 @@ GPSDriverUBX::payloadRxDone()
 
 		_gps_position->rtcm_msg_used  = (_buf.payload_rx_rxm_rtcm.flags & UBX_RX_RXM_RTCM_MSGUSED_MASK) >>
 						UBX_RX_RXM_RTCM_MSGUSED_SHIFT;
+
+		_counters.rtcm_received++;
+
+		if (_gps_position->rtcm_crc_failed) {
+			_counters.rtcm_crc_failed++;
+		}
+
+		if (_gps_position->rtcm_msg_used == 1) {
+			_counters.rtcm_not_used++;
+		}
 
 		ret = 1;
 		break;

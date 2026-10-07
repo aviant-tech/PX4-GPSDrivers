@@ -1011,6 +1011,23 @@ public:
 
 	const Board &board() const { return _board; }
 
+	struct Counters {
+		uint32_t bytes_discarded;
+		uint16_t checksum_errors;
+		uint16_t length_errors;
+		uint16_t itow_gap_max_ms;
+		uint16_t rtcm_received;
+		uint16_t rtcm_crc_failed;
+		uint16_t rtcm_not_used;
+	};
+
+	Counters takeCounters()
+	{
+		const Counters counters = _counters;
+		_counters = {};
+		return counters;
+	}
+
 private:
 
 private:
@@ -1169,6 +1186,9 @@ private:
 	bool _configured{false};
 	bool _got_posllh{false};
 	bool _got_velned{false};
+	uint32_t _last_pvt_itow{0};
+	bool _last_pvt_itow_valid{false};
+	Counters _counters{};
 	bool _proto_ver_27_or_higher{false}; ///< true if protocol version 27 or higher detected
 	bool _use_nav_pvt{false};
 
