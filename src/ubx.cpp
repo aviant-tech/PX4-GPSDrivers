@@ -2605,13 +2605,6 @@ bool GPSDriverUBX::disableUbxMBRover()
 		return false;
 	}
 
-	if (!softResetPosition()) {
-		UBX_WARN("Error: disableUbxMBRover() failed to reset receiver (%d)", errno);
-		return false;
-	}
-
-
-
 	_disabled_rover_mode = true;
 	return true;
 }
