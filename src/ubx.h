@@ -419,10 +419,20 @@
 
 #define UBX_PAYLOAD_RX_NAV_PVT_SIZE_UBX7        (sizeof(ubx_payload_rx_nav_pvt_t) - 8)
 #define UBX_PAYLOAD_RX_NAV_PVT_SIZE_UBX8        (sizeof(ubx_payload_rx_nav_pvt_t))
+#define UBX_PAYLOAD_RX_CFG_VALGET_SIZE_EMPTY    (sizeof(ubx_payload_tx_cfg_valget_t) - sizeof(uint32_t))
 
 #define UBX_CFG_LAYER_RAM                       (1 << 0)
 #define UBX_CFG_LAYER_BBR                       (1 << 1)
 #define UBX_CFG_LAYER_FLASH                     (1 << 2)
+
+#define UBX_CFG_VALGET_LAYER_RAM                0
+#define UBX_CFG_VALGET_LAYER_BBR                1
+#define UBX_CFG_VALGET_LAYER_FLASH              2
+#define UBX_CFG_VALGET_LAYER_DEFAULT            7
+
+#define UBX_CONFIG_SAVE_TIMEOUT                 1000
+#define UBX_CONFIG_SAVE_RETRIES                 3
+#define UBX_CONFIG_SAVE_DEADLINE                5000
 
 // Forward Declaration
 class RTCMParsing;
@@ -760,6 +770,23 @@ typedef struct {
 	uint8_t  deviceMask;    /**< Storage devices to apply this top */
 } ubx_payload_tx_cfg_cfg_t;
 
+/* Tx CFG-VALGET (protocol version 27+) */
+typedef struct {
+	uint8_t  version;
+	uint8_t  layer;
+	uint16_t position;
+	uint32_t key;
+} ubx_payload_tx_cfg_valget_t;
+
+/* Rx CFG-VALGET (protocol version 27+) */
+typedef struct {
+	uint8_t  version;
+	uint8_t  layer;
+	uint16_t position;
+	uint32_t key;
+	uint32_t value;
+} ubx_payload_rx_cfg_valget_t;
+
 /* Tx CFG-VALSET (protocol version 27+) */
 typedef struct {
 	uint8_t version;        /**< Message version, set to 0 */
@@ -922,6 +949,8 @@ typedef union {
 	ubx_payload_rx_rxm_rtcm_t         payload_rx_rxm_rtcm;
 	ubx_payload_rx_ack_ack_t          payload_rx_ack_ack;
 	ubx_payload_rx_ack_nak_t          payload_rx_ack_nak;
+	ubx_payload_rx_cfg_valget_t       payload_rx_cfg_valget;
+	ubx_payload_tx_cfg_valget_t       payload_tx_cfg_valget;
 	ubx_payload_tx_cfg_prt_t          payload_tx_cfg_prt;
 	ubx_payload_tx_cfg_rate_t         payload_tx_cfg_rate;
 	ubx_payload_tx_cfg_nav5_t         payload_tx_cfg_nav5;
@@ -1015,6 +1044,14 @@ private:
 
 private:
 
+	enum class FlashConfigResult : uint8_t {
+		Value,
+		Missing,
+		Rejected,
+		NoReply,
+		Error,
+	};
+
 	int activateRTCMOutput(bool reduce_update_rate);
 
 	/**
@@ -1087,6 +1124,12 @@ private:
 	 * Calculate FNV1 hash
 	 */
 	uint32_t fnv1_32_str(uint8_t *str, uint32_t hval);
+
+	FlashConfigResult getFlashConfigValueU4(uint32_t key_id, uint32_t &value);
+
+	bool setConfigValueU4(uint32_t key_id, uint32_t value, uint8_t layers);
+
+	void saveBaudrate(unsigned baudrate);
 
 	/**
 	 * Init _buf as CFG-VALSET
@@ -1170,6 +1213,7 @@ private:
 	bool _got_posllh{false};
 	bool _got_velned{false};
 	bool _proto_ver_27_or_higher{false}; ///< true if protocol version 27 or higher detected
+	bool _cfg_valget_received{false};
 	bool _use_nav_pvt{false};
 
 	uint8_t _rx_ck_a{0};
@@ -1182,6 +1226,8 @@ private:
 	uint16_t _rx_payload_length{0};
 
 	uint32_t _ubx_version{0};
+	uint32_t _cfg_valget_key{0};
+	uint32_t _cfg_valget_value{0};
 
 	uint64_t _last_timestamp_time{0};
 
