@@ -244,6 +244,8 @@ public:
 	 */
 	virtual bool shouldInjectRTCM() { return true; }
 
+	void setLogName(const char *log_name) { _log_name = log_name; }
+
 protected:
 
 	/**
@@ -318,6 +320,8 @@ protected:
 
 	GPSCallbackPtr _callback{nullptr};
 	void *_callback_user{};
+
+	const char *_log_name{"gps"};
 
 	uint8_t _rate_count_lat_lon{};
 	uint8_t _rate_count_vel{};
