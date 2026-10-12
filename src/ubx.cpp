@@ -2745,13 +2745,6 @@ bool GPSDriverUBX::disableUbxMBRover()
 		return false;
 	}
 
-	if (!softResetPosition()) {
-		UBX_WARN("Error: disableUbxMBRover() failed to reset receiver (%d)", errno);
-		return false;
-	}
-
-
-
 	_disabled_rover_mode = true;
 	return true;
 }
@@ -2773,6 +2766,7 @@ bool GPSDriverUBX::enableUbxMBRover()
 		return false;
 	}
 
+	// Without this reset, it takes forever to regain RTK fix for some reason
 	if (!softResetPosition()) {
 		UBX_WARN("Error: enableUbxMBRover() failed to reset receiver (%d)", errno);
 		return false;
