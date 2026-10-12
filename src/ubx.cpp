@@ -72,12 +72,13 @@ using namespace time_literals;
 
 GPSDriverUBX::GPSDriverUBX(Interface gpsInterface, GPSCallbackPtr callback, void *callback_user,
 			   sensor_gps_s *gps_position, satellite_info_s *satellite_info, uint8_t dynamic_model,
-			   float heading_offset, int32_t uart2_baudrate, UBXMode mode) :
+			   float heading_offset, int32_t uart2_baudrate, UBXMode mode, uint8_t dgnss_timeout) :
 	GPSBaseStationSupport(callback, callback_user),
 	_interface(gpsInterface),
 	_gps_position(gps_position),
 	_satellite_info(satellite_info),
 	_dyn_model(dynamic_model),
+	_dgnss_timeout(dgnss_timeout),
 	_mode(mode),
 	_heading_offset(heading_offset),
 	_uart2_baudrate(uart2_baudrate)
@@ -593,6 +594,20 @@ int GPSDriverUBX::configureDevice(const GPSConfig &config, const int32_t uart2_b
 	}
 
 	waitForAck(UBX_MSG_CFG_VALSET, UBX_CONFIG_TIMEOUT, false);
+
+	// DGNSS timeout (optional, as not all devices support it)
+	if (_dgnss_timeout > 0) {
+		cfg_valset_msg_size = initCfgValset();
+		cfgValset<uint8_t>(UBX_CFG_KEY_NAVSPG_DGNSSTO, _dgnss_timeout, cfg_valset_msg_size);
+
+		if (!sendMessage(UBX_MSG_CFG_VALSET, (uint8_t *)&_buf, cfg_valset_msg_size)) {
+			return -1;
+		}
+
+		if (waitForAck(UBX_MSG_CFG_VALSET, UBX_CONFIG_TIMEOUT, false) < 0) {
+			UBX_WARN("DGNSS timeout config failed. Unsupported device?");
+		}
+	}
 
 	cfg_valset_msg_size = initCfgValset();
 
