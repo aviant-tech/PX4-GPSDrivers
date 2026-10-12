@@ -112,6 +112,7 @@ GPSDriverUBX::configure(unsigned &baudrate, const GPSConfig &config)
 
 		/* try different baudrates */
 		const unsigned baudrates[] = {38400, 57600, 9600, 115200, 230400, 460800, 921600};
+		const unsigned num_baudrates = sizeof(baudrates) / sizeof(baudrates[0]);
 
 		unsigned baud_i;
 		unsigned desired_baudrate = auto_baudrate ? UBX_BAUDRATE_M8_AND_NEWER : baudrate;
@@ -120,11 +121,11 @@ GPSDriverUBX::configure(unsigned &baudrate, const GPSConfig &config)
 			desired_baudrate = UART1_BAUDRATE_HEADING;
 		}
 
-		for (baud_i = 0; baud_i < sizeof(baudrates) / sizeof(baudrates[0]); baud_i++) {
-			unsigned test_baudrate = baudrates[baud_i];
+		for (baud_i = 0; baud_i <= num_baudrates; baud_i++) {
+			const unsigned test_baudrate = (baud_i == 0) ? desired_baudrate : baudrates[baud_i - 1];
 
-			if (!auto_baudrate && baudrate != test_baudrate) {
-				continue; // skip to next baudrate
+			if ((baud_i > 0) && (test_baudrate == desired_baudrate)) {
+				continue;
 			}
 
 			UBX_DEBUG("baudrate set to %i", test_baudrate);
@@ -234,7 +235,7 @@ GPSDriverUBX::configure(unsigned &baudrate, const GPSConfig &config)
 			break;
 		}
 
-		if (baud_i >= sizeof(baudrates) / sizeof(baudrates[0])) {
+		if (baud_i > num_baudrates) {
 			return -1;	// connection and/or baudrate detection failed
 		}
 
@@ -296,6 +297,9 @@ GPSDriverUBX::configure(unsigned &baudrate, const GPSConfig &config)
 		return -1;
 	}
 
+	if (_interface == Interface::UART && _proto_ver_27_or_higher && !auto_baudrate) {
+		saveBaudrate(baudrate);
+	}
 
 	/* Now that we know the board, update the baudrate on M8 boards (on F9+ we already used the
 	 * higher baudrate with CFG-VALSET) */
@@ -839,6 +843,103 @@ int GPSDriverUBX::configureDevice(const GPSConfig &config, const int32_t uart2_b
 	}
 
 	return 0;
+}
+
+GPSDriverUBX::FlashConfigResult GPSDriverUBX::getFlashConfigValueU4(uint32_t key_id, uint32_t &value)
+{
+	memset(&_buf.payload_tx_cfg_valget, 0, sizeof(_buf.payload_tx_cfg_valget));
+	_buf.payload_tx_cfg_valget.layer = UBX_CFG_VALGET_LAYER_FLASH;
+	_buf.payload_tx_cfg_valget.key = key_id;
+
+	_cfg_valget_received = false;
+	_cfg_valget_key = 0;
+
+	if (!sendMessage(UBX_MSG_CFG_VALGET, (uint8_t *)&_buf, sizeof(_buf.payload_tx_cfg_valget))) {
+		return FlashConfigResult::Error;
+	}
+
+	_ack_state = UBX_ACK_WAITING;
+	_ack_waiting_msg = UBX_MSG_CFG_VALGET;
+
+	const gps_abstime time_started = gps_absolute_time();
+
+	while (!_cfg_valget_received && (_ack_state != UBX_ACK_GOT_NAK)
+	       && (gps_absolute_time() < time_started + UBX_CONFIG_SAVE_TIMEOUT * 1000)) {
+		receive(UBX_CONFIG_TIMEOUT);
+	}
+
+	const bool rejected = (_ack_state == UBX_ACK_GOT_NAK);
+	_ack_state = UBX_ACK_IDLE;
+
+	if (_cfg_valget_received) {
+		if (_cfg_valget_key != key_id) {
+			return FlashConfigResult::Missing;
+		}
+
+		value = _cfg_valget_value;
+		return FlashConfigResult::Value;
+	}
+
+	return rejected ? FlashConfigResult::Rejected : FlashConfigResult::NoReply;
+}
+
+bool GPSDriverUBX::setConfigValueU4(uint32_t key_id, uint32_t value, uint8_t layers)
+{
+	int cfg_valset_msg_size = initCfgValset();
+	_buf.payload_tx_cfg_valset.layers = layers;
+	cfgValset<uint32_t>(key_id, value, cfg_valset_msg_size);
+
+	return sendMessage(UBX_MSG_CFG_VALSET, (uint8_t *)&_buf, cfg_valset_msg_size)
+	       && (waitForAck(UBX_MSG_CFG_VALSET, UBX_CONFIG_SAVE_TIMEOUT, true) == 0);
+}
+
+void GPSDriverUBX::saveBaudrate(unsigned baudrate)
+{
+	if (!setConfigValueU4(UBX_CFG_KEY_CFG_UART1_BAUDRATE, baudrate, UBX_CFG_LAYER_BBR)) {
+		UBX_WARN("failed to save baudrate %u to BBR", baudrate);
+	}
+
+	const gps_abstime deadline = gps_absolute_time() + UBX_CONFIG_SAVE_DEADLINE * 1000;
+	uint32_t flash_baudrate = 0;
+	FlashConfigResult flash = FlashConfigResult::NoReply;
+
+	for (int i = 0; (i < UBX_CONFIG_SAVE_RETRIES) && (flash == FlashConfigResult::NoReply)
+	     && ((i == 0) || (gps_absolute_time() < deadline)); i++) {
+		flash = getFlashConfigValueU4(UBX_CFG_KEY_CFG_UART1_BAUDRATE, flash_baudrate);
+	}
+
+	if ((flash == FlashConfigResult::Error) || ((flash == FlashConfigResult::Value) && (flash_baudrate == baudrate))) {
+		return;
+	}
+
+	bool written = false;
+
+	for (int i = 0; (i < UBX_CONFIG_SAVE_RETRIES) && !written
+	     && ((i == 0) || (gps_absolute_time() < deadline)); i++) {
+		written = setConfigValueU4(UBX_CFG_KEY_CFG_UART1_BAUDRATE, baudrate, UBX_CFG_LAYER_FLASH);
+	}
+
+	if (!written) {
+		if (flash != FlashConfigResult::Rejected) {
+			UBX_WARN("failed to save baudrate %u to flash", baudrate);
+		}
+
+		return;
+	}
+
+	FlashConfigResult check = FlashConfigResult::NoReply;
+
+	for (int i = 0; (i < UBX_CONFIG_SAVE_RETRIES) && (check == FlashConfigResult::NoReply)
+	     && ((i == 0) || (gps_absolute_time() < deadline)); i++) {
+		check = getFlashConfigValueU4(UBX_CFG_KEY_CFG_UART1_BAUDRATE, flash_baudrate);
+	}
+
+	if ((check == FlashConfigResult::Value) && (flash_baudrate == baudrate)) {
+		GPS_INFO("u-blox baudrate %u saved", baudrate);
+
+	} else {
+		UBX_WARN("baudrate %u not confirmed in flash", baudrate);
+	}
 }
 
 int GPSDriverUBX::initCfgValset()
@@ -1467,6 +1568,17 @@ GPSDriverUBX::payloadRxInit()
 
 		} else if (!_configured) {
 			_rx_state = UBX_RXMSG_IGNORE;        // ignore if not _configured
+		}
+
+		break;
+
+	case UBX_MSG_CFG_VALGET:
+		if ((_rx_payload_length != sizeof(ubx_payload_rx_cfg_valget_t))
+		    && (_rx_payload_length != UBX_PAYLOAD_RX_CFG_VALGET_SIZE_EMPTY)) {
+			_rx_state = UBX_RXMSG_ERROR_LENGTH;
+
+		} else if (_configured) {
+			_rx_state = UBX_RXMSG_IGNORE;
 		}
 
 		break;
@@ -2324,6 +2436,19 @@ GPSDriverUBX::payloadRxDone()
 
 		_gps_position->rtcm_msg_used  = (_buf.payload_rx_rxm_rtcm.flags & UBX_RX_RXM_RTCM_MSGUSED_MASK) >>
 						UBX_RX_RXM_RTCM_MSGUSED_SHIFT;
+
+		ret = 1;
+		break;
+
+	case UBX_MSG_CFG_VALGET:
+		UBX_TRACE_RXMSG("Rx CFG-VALGET");
+
+		if (_rx_payload_length == sizeof(ubx_payload_rx_cfg_valget_t)) {
+			_cfg_valget_key = _buf.payload_rx_cfg_valget.key;
+			_cfg_valget_value = _buf.payload_rx_cfg_valget.value;
+		}
+
+		_cfg_valget_received = true;
 
 		ret = 1;
 		break;
