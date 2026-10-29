@@ -562,12 +562,12 @@ int GPSDriverUBX::configureDevice(const GPSConfig &config, const int32_t uart2_b
 	cfgValset<uint8_t>(UBX_CFG_KEY_ODO_OUTLPCOG, 0, cfg_valset_msg_size);
 
 	// measurement rate
-	// In case of F9P not in moving base mode we use 10Hz, otherwise 8Hz (receivers such as M9N can go higher as well, but
-	// the number of used satellites will be restricted to 16. Not mentioned in datasheet)
+	// In case of F9P not in moving base mode we use 10Hz, in moving base mode 5Hz, otherwise 8Hz (receivers such as
+	// M9N can go higher as well, but the number of used satellites will be restricted to 16. Not mentioned in datasheet)
 	int rate_meas;
 
 	if (_mode != UBXMode::Normal) {
-		rate_meas = 125; //8Hz for heading.
+		rate_meas = 200; //5Hz for heading.
 
 	} else {
 		rate_meas = (_board == Board::u_blox9_F9P) ? 100 : 125;
