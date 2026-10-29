@@ -112,6 +112,7 @@
 #define UBX_ID_MON_VER        0x04
 #define UBX_ID_MON_HW         0x09 // deprecated in protocol version >= 27 -> use MON_RF
 #define UBX_ID_MON_RF         0x38
+#define UBX_ID_MON_SYS        0x39
 
 /* UBX ID for RTCM3 output messages */
 /* Minimal messages for RTK: 1005, 1077 + (1087 or 1127) */
@@ -167,6 +168,7 @@
 #define UBX_MSG_MON_HW        ((UBX_CLASS_MON) | UBX_ID_MON_HW << 8)
 #define UBX_MSG_MON_VER       ((UBX_CLASS_MON) | UBX_ID_MON_VER << 8)
 #define UBX_MSG_MON_RF        ((UBX_CLASS_MON) | UBX_ID_MON_RF << 8)
+#define UBX_MSG_MON_SYS       ((UBX_CLASS_MON) | UBX_ID_MON_SYS << 8)
 #define UBX_MSG_RTCM3_1005    ((UBX_CLASS_RTCM3) | UBX_ID_RTCM3_1005 << 8)
 #define UBX_MSG_RTCM3_1077    ((UBX_CLASS_RTCM3) | UBX_ID_RTCM3_1077 << 8)
 #define UBX_MSG_RTCM3_1087    ((UBX_CLASS_RTCM3) | UBX_ID_RTCM3_1087 << 8)
@@ -354,6 +356,7 @@
 #define UBX_CFG_KEY_TMODE_SVIN_ACC_LIMIT        0x40030011
 
 #define UBX_CFG_KEY_MSGOUT_UBX_MON_RF_I2C        0x20910359
+#define UBX_CFG_KEY_MSGOUT_UBX_MON_SYS_I2C       0x2091069d
 #define UBX_CFG_KEY_MSGOUT_UBX_NAV_SVIN_I2C      0x20910088
 #define UBX_CFG_KEY_MSGOUT_UBX_NAV_SAT_I2C       0x20910015
 #define UBX_CFG_KEY_MSGOUT_UBX_NAV_STATUS_I2C    0x2091001a
@@ -705,6 +708,23 @@ typedef struct {
 	ubx_payload_rx_mon_rf_block_t block[1]; ///< only read out the first block
 } ubx_payload_rx_mon_rf_t;
 
+typedef struct {
+	uint8_t  msgVer;
+	uint8_t  bootType;
+	uint8_t  cpuLoad;
+	uint8_t  cpuLoadMax;
+	uint8_t  memUsage;
+	uint8_t  memUsageMax;
+	uint8_t  ioUsage;
+	uint8_t  ioUsageMax;
+	uint32_t runTime;
+	uint16_t noticeCount;
+	uint16_t warnCount;
+	uint16_t errorCount;
+	int8_t   tempValue;
+	uint8_t  reserved0[5];
+} ubx_payload_rx_mon_sys_t;
+
 /* Rx MON-VER Part 1 */
 typedef struct {
 	uint8_t swVersion[30];
@@ -945,6 +965,7 @@ typedef union {
 	ubx_payload_rx_mon_hw_ubx7_t      payload_rx_mon_hw_ubx7;
 	ubx_payload_rx_mon_hw_deprecated_t ubx_payload_rx_mon_hw_deprecated;
 	ubx_payload_rx_mon_rf_t           payload_rx_mon_rf;
+	ubx_payload_rx_mon_sys_t          payload_rx_mon_sys;
 	ubx_payload_rx_mon_ver_part1_t    payload_rx_mon_ver_part1;
 	ubx_payload_rx_mon_ver_part2_t    payload_rx_mon_ver_part2;
 	ubx_payload_rx_rxm_rtcm_t         payload_rx_rxm_rtcm;

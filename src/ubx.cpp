@@ -721,6 +721,15 @@ int GPSDriverUBX::configureDevice(const GPSConfig &config, const int32_t uart2_b
 		return -1;
 	}
 
+	cfg_valset_msg_size = initCfgValset();
+	cfgValsetPort(UBX_CFG_KEY_MSGOUT_UBX_MON_SYS_I2C, 1000 / rate_meas, cfg_valset_msg_size);
+
+	if (!sendMessage(UBX_MSG_CFG_VALSET, (uint8_t *)&_buf, cfg_valset_msg_size)) {
+		return -1;
+	}
+
+	waitForAck(UBX_MSG_CFG_VALSET, UBX_CONFIG_TIMEOUT, false);
+
 	if (_interface == Interface::UART || _interface == Interface::SPI) {
 
 		// Enable/Disable GPS protocols at I2C interface
@@ -1577,6 +1586,16 @@ GPSDriverUBX::payloadRxInit()
 
 		break;
 
+	case UBX_MSG_MON_SYS:
+		if (_rx_payload_length != sizeof(ubx_payload_rx_mon_sys_t)) {
+			_rx_state = UBX_RXMSG_ERROR_LENGTH;
+
+		} else if (!_configured) {
+			_rx_state = UBX_RXMSG_IGNORE;
+		}
+
+		break;
+
 	case UBX_MSG_RXM_RTCM:
 		if (_rx_payload_length != sizeof(ubx_payload_rx_rxm_rtcm_t)) {
 			_rx_state = UBX_RXMSG_ERROR_LENGTH;
@@ -2415,6 +2434,14 @@ GPSDriverUBX::payloadRxDone()
 			break;
 		}
 
+		break;
+
+	case UBX_MSG_MON_SYS:
+		UBX_TRACE_RXMSG("Rx MON-SYS");
+
+		_gps_position->cpu_load = _buf.payload_rx_mon_sys.cpuLoad;
+
+		ret = 1;
 		break;
 
 	case UBX_MSG_MON_RF:
